@@ -20,6 +20,16 @@ const Mobiliario = {
       [cantidad, id],
       callback
     );
+  },
+
+  delete: (id, callback) => {
+    db.query(
+      "DELETE FROM mobiliario WHERE id = ?",
+      [id],
+      callback
+    );
   }
+
 };
+
 export default Mobiliario;
