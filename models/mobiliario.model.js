@@ -6,6 +6,14 @@ const Mobiliario = {
     db.query("SELECT * FROM mobiliario", callback);
   },
 
+  create: (tipo, cantidad, callback) => {
+    db.query(
+      "INSERT INTO mobiliario (tipo, cantidad) VALUES (?, ?)",
+      [tipo, cantidad],
+      callback
+    );
+  },
+
   updateCantidad: (id, cantidad, callback) => {
     db.query(
       "UPDATE mobiliario SET cantidad = ? WHERE id = ?",
@@ -13,7 +21,5 @@ const Mobiliario = {
       callback
     );
   }
-
 };
-
 export default Mobiliario;
