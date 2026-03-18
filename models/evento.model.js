@@ -55,7 +55,7 @@ const insertEventoServicioItem = async (
 
 const getEventos = async () => {
   const [eventos] = await db.promise().query(
-    `SELECT e.*, s.nombre AS salon
+    `SELECT e.*, s.nombre AS nombre_salon
      FROM eventos e
      LEFT JOIN salones s ON e.id_salon = s.id_salon
      ORDER BY e.fecha_evento DESC`
