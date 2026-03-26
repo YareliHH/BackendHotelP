@@ -63,10 +63,26 @@ const getEventos = async () => {
 
   return eventos;
 };
+//////////////////////////////////////////////////////
+// ✅ RESUMEN DASHBOARD (LO NUEVO)
+//////////////////////////////////////////////////////
 
+const getResumen = async () => {
+  const [rows] = await db.promise().query(`
+    SELECT 
+      (SELECT COUNT(*) FROM eventos) AS totalEventos,
+      (SELECT COUNT(*) FROM salones) AS salonesTotales
+  `);
+
+  return rows[0];
+};
+//////////////////////////////////////////////////////
+// EXPORT
+//////////////////////////////////////////////////////
 export default {
   createEvento,
   insertEventoServicio,
   insertEventoServicioItem,
-  getEventos
+  getEventos,
+  getResumen // 👈 IMPORTANTE
 };

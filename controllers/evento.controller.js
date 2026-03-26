@@ -76,3 +76,16 @@ export const obtenerEventos = async (req, res) => {
     res.status(500).json(error);
   }
 };
+//////////////////////////////////////////////////////
+// RESUMEN DASHBOARD
+//////////////////////////////////////////////////////
+
+export const obtenerResumen = async (req, res) => {
+  try {
+    const resumen = await Evento.getResumen(); // 👈 viene del model
+    res.json(resumen);
+  } catch (error) {
+    console.error('Error en resumen:', error);
+    res.status(500).json({ message: 'Error al obtener resumen' });
+  }
+};
