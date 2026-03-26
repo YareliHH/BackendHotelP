@@ -50,6 +50,28 @@ const insertEventoServicioItem = async (
 };
 
 //////////////////////////////////////////////////////
+// ACTUALIZAR TOTALES
+//////////////////////////////////////////////////////
+
+const actualizarTotales = async (
+  connection,
+  idEvento,
+  subtotal,
+  iva,
+  total,
+  monto_anticipo,
+  restante
+) => {
+  await connection.query(
+    `UPDATE eventos SET 
+      subtotal = ?, iva = ?, total = ?, 
+      monto_anticipo = ?, restante = ?
+     WHERE id_evento = ?`,
+    [subtotal, iva, total, monto_anticipo, restante, idEvento]
+  );
+};
+
+//////////////////////////////////////////////////////
 // OBTENER EVENTOS
 //////////////////////////////////////////////////////
 
@@ -63,8 +85,9 @@ const getEventos = async () => {
 
   return eventos;
 };
+
 //////////////////////////////////////////////////////
-// ✅ RESUMEN DASHBOARD (LO NUEVO)
+// RESUMEN DASHBOARD
 //////////////////////////////////////////////////////
 
 const getResumen = async () => {
@@ -76,13 +99,16 @@ const getResumen = async () => {
 
   return rows[0];
 };
+
 //////////////////////////////////////////////////////
 // EXPORT
 //////////////////////////////////////////////////////
+
 export default {
   createEvento,
   insertEventoServicio,
   insertEventoServicioItem,
+  actualizarTotales,  // 👈 agregado
   getEventos,
-  getResumen // 👈 IMPORTANTE
+  getResumen
 };
