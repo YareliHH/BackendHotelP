@@ -85,3 +85,35 @@ export const createServicioCompleto = async (req, res) => {
     res.status(500).json(error);
   }
 };
+/////////////////////////////////////////////////////
+// Obtener Estructura Completa (con secciones/items)
+/////////////////////////////////////////////////////
+
+export const getEstructura = async (req, res) => {
+  try {
+    const [servicios] = await db.promise().query(`SELECT * FROM servicios`);
+
+    for (const servicio of servicios) {
+      const [secciones] = await db.promise().query(
+        `SELECT * FROM servicio_secciones WHERE id_servicio = ?`,
+        [servicio.id_servicio]
+      );
+
+      for (const seccion of secciones) {
+        const [items] = await db.promise().query(
+          `SELECT * FROM servicio_items WHERE id_seccion = ?`,
+          [seccion.id_seccion]
+        );
+        seccion.items = items;
+      }
+
+      servicio.secciones = secciones;
+    }
+
+    res.json(servicios);
+
+  } catch (error) {
+    console.error('Error en getEstructura:', error);
+    res.status(500).json({ mensaje: 'Error al obtener estructura de servicios' });
+  }
+};

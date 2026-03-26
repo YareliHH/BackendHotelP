@@ -4,11 +4,13 @@ import {
   createServicio,
   updateServicio,
   deleteServicio,
-  createServicioCompleto
+  createServicioCompleto,
+   getEstructura  // 👈 agregar
 } from '../controllers/servicio.controller.js';
 
 const router = express.Router();
 
+router.get('/estructura', getEstructura); // 👈 agregar ANTES de la ruta '/'
 router.get('/', getServicios);
 router.post('/', createServicio);
 router.post('/completo', createServicioCompleto);
