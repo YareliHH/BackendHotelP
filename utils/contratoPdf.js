@@ -13,13 +13,9 @@ const LOGO_PATH = path.join(__dirname, "../assets/logotipoP.png");
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Formatea una fecha a DD/MM/YYYY evitando el bug de UTC.
- */
 function formatFecha(valor) {
   if (!valor) return "-";
   const str = String(valor);
-  // Si viene como "YYYY-MM-DD" lo parseamos directo para evitar offset UTC
   const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
   const d = new Date(valor);
@@ -30,10 +26,6 @@ function formatFecha(valor) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-/**
- * Dibuja un rectángulo de fondo con texto CENTRADO (encabezado de sección).
- * Retorna la Y siguiente al bloque.
- */
 function sectionHeader(doc, y, label, pageWidth) {
   const w = pageWidth - PAGE_MARGIN * 2;
   doc.rect(PAGE_MARGIN, y, w, 16).fill(GRAY_HEADER);
@@ -49,10 +41,6 @@ function sectionHeader(doc, y, label, pageWidth) {
   return y + 16;
 }
 
-/**
- * Dibuja etiqueta pequeña en gris y valor en negro.
- * Retorna doc.y al terminar.
- */
 function labelValue(doc, x, y, w, label, value) {
   doc.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
   doc.text(label.toUpperCase(), x, y, { width: w, lineBreak: false });
@@ -61,10 +49,6 @@ function labelValue(doc, x, y, w, label, value) {
   return doc.y;
 }
 
-/**
- * Dibuja dos columnas (izq / der).
- * Retorna la Y máxima de ambas columnas.
- */
 function twoColumns(doc, startY, pageWidth, leftFn, rightFn) {
   const totalW = pageWidth - PAGE_MARGIN * 2;
   const colW   = (totalW - COL_GAP) / 2;
@@ -87,9 +71,6 @@ function twoColumns(doc, startY, pageWidth, leftFn, rightFn) {
   return maxY;
 }
 
-/**
- * Verifica si hay espacio suficiente; si no, agrega una nueva página.
- */
 function checkPageBreak(doc, y, neededSpace) {
   if (y + neededSpace > doc.page.height - PAGE_MARGIN) {
     doc.addPage();
@@ -100,7 +81,7 @@ function checkPageBreak(doc, y, neededSpace) {
 
 // ─── Generador principal ─────────────────────────────────────────────────────
 
-function generarContratoPDF(res, evento, hotel) {
+function generarContratoPDF(res, evento, hotel, servicios = []) {
   const doc       = new PDFDocument({ margin: PAGE_MARGIN, size: "LETTER" });
   const pageWidth = doc.page.width;
   const totalW    = pageWidth - PAGE_MARGIN * 2;
@@ -128,8 +109,8 @@ function generarContratoPDF(res, evento, hotel) {
     });
   } catch (_) {}
 
-  const titleX   = PAGE_MARGIN;
-  const titleW   = pageWidth - PAGE_MARGIN * 2 - LOGO_W - 10;
+  const titleX    = PAGE_MARGIN;
+  const titleW    = pageWidth - PAGE_MARGIN * 2 - LOGO_W - 10;
   const titleTopY = PAGE_MARGIN + 6;
 
   doc
@@ -223,7 +204,6 @@ function generarContratoPDF(res, evento, hotel) {
   );
   y += 8;
 
-  // Línea separadora
   doc
     .moveTo(PAGE_MARGIN, y)
     .lineTo(pageWidth - PAGE_MARGIN, y)
@@ -232,7 +212,6 @@ function generarContratoPDF(res, evento, hotel) {
     .stroke();
   y += 4;
 
-  // Nota facturación
   doc.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
   doc.text("NOTA:", PAGE_MARGIN, y, { continued: true });
   doc.font("Helvetica").fillColor(DARK);
@@ -277,9 +256,87 @@ function generarContratoPDF(res, evento, hotel) {
       return d.y;
     }
   );
-  y += 6;
+  y += 8;
 
-  // Descripción del montaje
+  // ── TABLA DE SERVICIOS ────────────────────────────────────────────────────
+  // Solo se renderiza si hay servicios
+  if (servicios.length > 0) {
+    y = checkPageBreak(doc, y, 40 + servicios.length * 18);
+
+    // Encabezado de sección con el mismo estilo GRAY_HEADER
+    y = sectionHeader(doc, y, "Servicios contratados", pageWidth);
+    y += 6;
+
+    // ── Cabecera de columnas ──────────────────────────────────────────────
+    // Fondo gris claro para la fila de cabecera (GRAY_SECTION, igual que otras sub-cabeceras)
+    const COL = {
+      servicio:  { x: PAGE_MARGIN,       w: totalW * 0.45 },
+      precio:    { x: PAGE_MARGIN + totalW * 0.45 + 4, w: totalW * 0.18 },
+      pax:       { x: PAGE_MARGIN + totalW * 0.63 + 4, w: totalW * 0.12 },
+      subtotal:  { x: PAGE_MARGIN + totalW * 0.75 + 4, w: totalW * 0.25 },
+    };
+
+    doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
+    doc.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
+    doc.text("SERVICIO",  COL.servicio.x,  y + 4, { width: COL.servicio.w,  lineBreak: false });
+    doc.text("PRECIO",    COL.precio.x,    y + 4, { width: COL.precio.w,    lineBreak: false, align: "right" });
+    doc.text("PAX",       COL.pax.x,       y + 4, { width: COL.pax.w,       lineBreak: false, align: "center" });
+    doc.text("SUBTOTAL",  COL.subtotal.x,  y + 4, { width: COL.subtotal.w,  lineBreak: false, align: "right" });
+    y += 14;
+
+    // Línea bajo cabecera
+    doc
+      .moveTo(PAGE_MARGIN, y)
+      .lineTo(pageWidth - PAGE_MARGIN, y)
+      .strokeColor("#aaaaaa")
+      .lineWidth(0.5)
+      .stroke();
+    y += 4;
+
+    // ── Filas de servicios ────────────────────────────────────────────────
+    let totalServicios = 0;
+
+    servicios.forEach((s, i) => {
+      const precio   = Number(s.precio_unitario    || 0);
+      const pax      = Number(s.cantidad_personas  || 0);
+      const subtotal = precio * pax;
+      totalServicios += subtotal;
+
+      // Fondo alternado muy sutil (blanco / gris muy claro)
+      if (i % 2 === 1) {
+        doc.rect(PAGE_MARGIN, y, totalW, 16).fill("#f5f5f5");
+      }
+
+      doc.font("Helvetica").fontSize(9).fillColor(DARK);
+      doc.text(s.nombre || "-", COL.servicio.x, y + 3, { width: COL.servicio.w,  lineBreak: false });
+      doc.text(`$${precio.toFixed(2)}`, COL.precio.x,    y + 3, { width: COL.precio.w,   lineBreak: false, align: "right" });
+      doc.text(String(pax),             COL.pax.x,       y + 3, { width: COL.pax.w,      lineBreak: false, align: "center" });
+      doc.text(`$${subtotal.toFixed(2)}`, COL.subtotal.x, y + 3, { width: COL.subtotal.w, lineBreak: false, align: "right" });
+
+      y += 16;
+    });
+
+    // Línea antes del total
+    doc
+      .moveTo(PAGE_MARGIN, y)
+      .lineTo(pageWidth - PAGE_MARGIN, y)
+      .strokeColor("#aaaaaa")
+      .lineWidth(0.5)
+      .stroke();
+    y += 5;
+
+    // Fila TOTAL — estilo negrita, alineado a la derecha igual que el detalle financiero
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
+    doc.text(
+      `TOTAL SERVICIOS:  $${totalServicios.toFixed(2)}`,
+      PAGE_MARGIN,
+      y,
+      { width: totalW, align: "right", lineBreak: false }
+    );
+    y = doc.y + 10;
+  }
+
+  // ── DESCRIPCIÓN DEL MONTAJE ───────────────────────────────────────────────
   y = checkPageBreak(doc, y, 50);
   doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
   doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8)
@@ -292,7 +349,7 @@ function generarContratoPDF(res, evento, hotel) {
   doc.text(evento.especificaciones_montaje || "No especificado", PAGE_MARGIN + 4, y + 4, { width: totalW - 8 });
   y = doc.y + 10;
 
-  // Servicios complementarios
+  // ── SERVICIOS COMPLEMENTARIOS ─────────────────────────────────────────────
   y = checkPageBreak(doc, y, 80);
   doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
   doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8)
@@ -301,7 +358,7 @@ function generarContratoPDF(res, evento, hotel) {
     });
   y += 14 + 6;
 
-  const servicios = [
+  const serviciosComp = [
     ["EQUIPO AUDIOVISUAL",    evento.equipo_audiovisual],
     ["DECORACIÓN",            evento.decoracion],
     ["GUARDARROPA",           evento.guardarropa],
@@ -312,9 +369,9 @@ function generarContratoPDF(res, evento, hotel) {
     ["OTROS",                 evento.otros_servicios],
   ];
 
-  const mid       = Math.ceil(servicios.length / 2);
-  const leftServs  = servicios.slice(0, mid);
-  const rightServs = servicios.slice(mid);
+  const mid        = Math.ceil(serviciosComp.length / 2);
+  const leftServs  = serviciosComp.slice(0, mid);
+  const rightServs = serviciosComp.slice(mid);
 
   const drawServCol = (d, x, sy, w, items) => {
     let cy = sy;
@@ -374,12 +431,12 @@ function generarContratoPDF(res, evento, hotel) {
   y = sectionHeader(doc, y, "Detalle financiero", pageWidth);
   y += 8;
 
-  const subtotal     = Number(evento.subtotal           || 0);
-  const iva          = Number(evento.iva                || 0);
-  const total        = Number(evento.total              || 0);
-  const montoAnticipo = Number(evento.monto_anticipo    || 0);
-  const restante     = Number(evento.restante           || 0);
-  const pctAnticipo  = evento.porcentaje_anticipo       || 0;
+  const subtotal      = Number(evento.subtotal            || 0);
+  const iva           = Number(evento.iva                 || 0);
+  const total         = Number(evento.total               || 0);
+  const montoAnticipo = Number(evento.monto_anticipo       || 0);
+  const restante      = Number(evento.restante            || 0);
+  const pctAnticipo   = evento.porcentaje_anticipo         || 0;
 
   const finItems = [
     ["SUBTOTAL",   `$${subtotal.toFixed(2)}`],
@@ -423,7 +480,6 @@ function generarContratoPDF(res, evento, hotel) {
     const lineY = y + 10;
     doc.font("Helvetica").fontSize(8).fillColor(DARK);
     doc.text(txt, PAGE_MARGIN, y, { width: totalW * 0.55, lineBreak: false });
-    // Línea para llenar a la derecha
     doc
       .moveTo(PAGE_MARGIN + totalW * 0.58, lineY)
       .lineTo(PAGE_MARGIN + totalW, lineY)
@@ -449,17 +505,14 @@ function generarContratoPDF(res, evento, hotel) {
   doc.text(pubText, PAGE_MARGIN, pubTextStartY, { width: pubTextW });
   const pubTextEndY = doc.y;
 
-  // Casillas SI / NO centradas verticalmente con el texto
   const boxH    = 18;
   const boxW    = (pubBoxW - 8) / 2;
   const boxMidY = pubTextStartY + (pubTextEndY - pubTextStartY) / 2 - boxH / 2;
 
-  // Caja SI
   doc.rect(pubBoxX, boxMidY, boxW, boxH).strokeColor(DARK).lineWidth(0.8).stroke();
   doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
   doc.text("SI", pubBoxX, boxMidY + 5, { width: boxW, align: "center", lineBreak: false });
 
-  // Caja NO
   const noBoxX = pubBoxX + boxW + 8;
   doc.rect(noBoxX, boxMidY, boxW, boxH).strokeColor(DARK).lineWidth(0.8).stroke();
   doc.text("NO", noBoxX, boxMidY + 5, { width: boxW, align: "center", lineBreak: false });
@@ -476,17 +529,15 @@ function generarContratoPDF(res, evento, hotel) {
   y = doc.y + 24;
 
   // ── TABLA DE FIRMAS ───────────────────────────────────────────────────────
-  const firmaColW  = (totalW - COL_GAP) / 2;
+  const firmaColW   = (totalW - COL_GAP) / 2;
   const firmaLeftX  = PAGE_MARGIN;
   const firmaRightX = PAGE_MARGIN + firmaColW + COL_GAP;
 
-  // Encabezados "FIRMA" centrados en cada columna
   doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
   doc.text("FIRMA", firmaLeftX,  y, { width: firmaColW, align: "center", lineBreak: false });
   doc.text("FIRMA", firmaRightX, y, { width: firmaColW, align: "center", lineBreak: false });
   y += 14;
 
-  // Líneas de firma
   doc
     .moveTo(firmaLeftX, y)
     .lineTo(firmaLeftX + firmaColW, y)
@@ -498,14 +549,12 @@ function generarContratoPDF(res, evento, hotel) {
 
   y += 10;
 
-  // Fila CARGO (solo columna izquierda)
   doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
   doc.text("CARGO:", firmaLeftX, y, { continued: true });
   doc.font("Helvetica").fillColor(DARK);
   doc.text(`  ${hotel.cargo_coordinador || "Coordinador de Eventos"}`, { lineBreak: false });
   y = doc.y + 6;
 
-  // Fila NOMBRE — izquierda: nombre del coordinador | derecha: nombre del contratante
   const nombreCoordY = y;
   doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
   doc.text("NOMBRE", firmaLeftX, nombreCoordY, { continued: true });
