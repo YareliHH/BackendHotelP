@@ -80,7 +80,7 @@ const getEventos = async () => {
     `SELECT e.*, s.nombre AS nombre_salon
      FROM eventos e
      LEFT JOIN salones s ON e.id_salon = s.id_salon
-     ORDER BY e.fecha_evento DESC`
+     ORDER BY e.numero_contrato ASC`
   );
 
   return eventos;

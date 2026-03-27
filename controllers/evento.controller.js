@@ -1,5 +1,6 @@
 import db from '../config/db.js';
 import Evento from '../models/evento.model.js';
+import generarContratoPDF from '../utils/contratoPdf.js';
 
 //////////////////////////////////////////////////////
 // CREAR EVENTO COMPLETO
@@ -44,7 +45,6 @@ export const crearEvento = async (req, res) => {
         servicio.cantidad_personas
       );
 
-      // Obtener precio del servicio
       const [servicioData] = await connection.query(
         `SELECT precio_unitario FROM servicios WHERE id_servicio = ?`,
         [servicio.id_servicio]
@@ -53,7 +53,6 @@ export const crearEvento = async (req, res) => {
         subtotal += Number(servicioData[0].precio_unitario) * Number(servicio.cantidad_personas);
       }
 
-      // 4️⃣ Insertar items seleccionados
       if (servicio.itemsSeleccionados && servicio.itemsSeleccionados.length > 0) {
         for (const idItem of servicio.itemsSeleccionados) {
           await Evento.insertEventoServicioItem(connection, idEventoServicio, idItem);
@@ -61,13 +60,13 @@ export const crearEvento = async (req, res) => {
       }
     }
 
-    // 5️⃣ Calcular totales
+    // 4️⃣ Calcular totales
     const iva = subtotal * 0.16;
     const total = subtotal + iva;
     const monto_anticipo = total * (Number(eventoData.porcentaje_anticipo) / 100);
     const restante = total - monto_anticipo;
 
-    // 6️⃣ Actualizar totales en el evento
+    // 5️⃣ Actualizar totales
     await Evento.actualizarTotales(
       connection,
       idEvento,
@@ -118,5 +117,44 @@ export const obtenerResumen = async (req, res) => {
   } catch (error) {
     console.error('Error en resumen:', error);
     res.status(500).json({ message: 'Error al obtener resumen' });
+  }
+};
+
+//////////////////////////////////////////////////////
+// 🔥 GENERAR CONTRATO PDF (YA CON HOTEL)
+//////////////////////////////////////////////////////
+
+export const generarContrato = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 🔹 EVENTO
+    const [eventos] = await db.promise().query(
+      `SELECT e.*, s.nombre AS nombre_salon
+       FROM eventos e
+       LEFT JOIN salones s ON e.id_salon = s.id_salon
+       WHERE e.id_evento = ?`,
+      [id]
+    );
+
+    if (eventos.length === 0) {
+      return res.status(404).json({ mensaje: 'Evento no encontrado' });
+    }
+
+    const evento = eventos[0];
+
+    // HOTEL (AQUÍ ESTÁ LA CLAVE)
+    const [hotelRows] = await db.promise().query(
+      `SELECT * FROM hotel LIMIT 1`
+    );
+
+    const hotel = hotelRows[0];
+
+    // 🔹 ENVIAR AL PDF
+    generarContratoPDF(res, evento, hotel);
+
+  } catch (error) {
+    console.error('Error al generar contrato:', error);
+    res.status(500).json({ mensaje: 'Error al generar contrato' });
   }
 };
