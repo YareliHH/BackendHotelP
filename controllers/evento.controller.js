@@ -121,14 +121,13 @@ export const obtenerResumen = async (req, res) => {
 };
 
 //////////////////////////////////////////////////////
-// 🔥 GENERAR CONTRATO PDF (YA CON HOTEL)
+// 🔥 GENERAR CONTRATO PDF (YA CON HOTEL Y SERVICIOS)
 //////////////////////////////////////////////////////
-
 export const generarContrato = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 🔹 EVENTO
+    // 🔹 1. TRAER EVENTO
     const [eventos] = await db.promise().query(
       `SELECT e.*, s.nombre AS nombre_salon
        FROM eventos e
@@ -143,15 +142,27 @@ export const generarContrato = async (req, res) => {
 
     const evento = eventos[0];
 
-    // HOTEL (AQUÍ ESTÁ LA CLAVE)
+    // 🔹 2. TRAER HOTEL
     const [hotelRows] = await db.promise().query(
       `SELECT * FROM hotel LIMIT 1`
     );
-
     const hotel = hotelRows[0];
 
-    // 🔹 ENVIAR AL PDF
-    generarContratoPDF(res, evento, hotel);
+    // 🔥 3. TRAER SERVICIOS (AQUÍ ESTABA LO QUE TE FALTABA)
+    const [servicios] = await db.promise().query(
+      `SELECT 
+        s.nombre,
+        s.precio_unitario,
+        es.cantidad_personas
+       FROM evento_servicios es
+       INNER JOIN servicios s 
+         ON s.id_servicio = es.id_servicio
+       WHERE es.id_evento = ?`,
+      [id]
+    );
+
+    // 🔹 4. ENVIAR TODO AL PDF
+    generarContratoPDF(res, evento, hotel, servicios);
 
   } catch (error) {
     console.error('Error al generar contrato:', error);

@@ -258,33 +258,32 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 8;
 
-  // ── TABLA DE SERVICIOS ────────────────────────────────────────────────────
-  // Solo se renderiza si hay servicios
+  // ── TABLA DE SERVICIOS CONTRATADOS ────────────────────────────────────────
   if (servicios.length > 0) {
     y = checkPageBreak(doc, y, 40 + servicios.length * 18);
 
-    // Encabezado de sección con el mismo estilo GRAY_HEADER
+    // Encabezado de sección — mismo estilo GRAY_HEADER que el resto
     y = sectionHeader(doc, y, "Servicios contratados", pageWidth);
     y += 6;
 
-    // ── Cabecera de columnas ──────────────────────────────────────────────
-    // Fondo gris claro para la fila de cabecera (GRAY_SECTION, igual que otras sub-cabeceras)
+    // Definición de columnas
     const COL = {
-      servicio:  { x: PAGE_MARGIN,       w: totalW * 0.45 },
-      precio:    { x: PAGE_MARGIN + totalW * 0.45 + 4, w: totalW * 0.18 },
-      pax:       { x: PAGE_MARGIN + totalW * 0.63 + 4, w: totalW * 0.12 },
-      subtotal:  { x: PAGE_MARGIN + totalW * 0.75 + 4, w: totalW * 0.25 },
+      servicio: { x: PAGE_MARGIN,                        w: totalW * 0.45 },
+      precio:   { x: PAGE_MARGIN + totalW * 0.45 + 4,   w: totalW * 0.18 },
+      pax:      { x: PAGE_MARGIN + totalW * 0.63 + 4,   w: totalW * 0.12 },
+      subtotal: { x: PAGE_MARGIN + totalW * 0.75 + 4,   w: totalW * 0.25 },
     };
 
+    // Cabecera de columnas — fondo GRAY_SECTION (igual que sub-cabeceras del resto del doc)
     doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
     doc.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
-    doc.text("SERVICIO",  COL.servicio.x,  y + 4, { width: COL.servicio.w,  lineBreak: false });
-    doc.text("PRECIO",    COL.precio.x,    y + 4, { width: COL.precio.w,    lineBreak: false, align: "right" });
-    doc.text("PAX",       COL.pax.x,       y + 4, { width: COL.pax.w,       lineBreak: false, align: "center" });
-    doc.text("SUBTOTAL",  COL.subtotal.x,  y + 4, { width: COL.subtotal.w,  lineBreak: false, align: "right" });
+    doc.text("SERVICIO",  COL.servicio.x, y + 4, { width: COL.servicio.w, lineBreak: false });
+    doc.text("PRECIO",    COL.precio.x,   y + 4, { width: COL.precio.w,   lineBreak: false, align: "right" });
+    doc.text("PAX",       COL.pax.x,      y + 4, { width: COL.pax.w,      lineBreak: false, align: "center" });
+    doc.text("SUBTOTAL",  COL.subtotal.x, y + 4, { width: COL.subtotal.w, lineBreak: false, align: "right" });
     y += 14;
 
-    // Línea bajo cabecera
+    // Línea bajo la cabecera
     doc
       .moveTo(PAGE_MARGIN, y)
       .lineTo(pageWidth - PAGE_MARGIN, y)
@@ -293,25 +292,24 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
       .stroke();
     y += 4;
 
-    // ── Filas de servicios ────────────────────────────────────────────────
+    // Filas de servicios con fondo alternado sutil
     let totalServicios = 0;
 
     servicios.forEach((s, i) => {
-      const precio   = Number(s.precio_unitario    || 0);
-      const pax      = Number(s.cantidad_personas  || 0);
+      const precio   = Number(s.precio_unitario   || 0);
+      const pax      = Number(s.cantidad_personas || 0);
       const subtotal = precio * pax;
       totalServicios += subtotal;
 
-      // Fondo alternado muy sutil (blanco / gris muy claro)
       if (i % 2 === 1) {
         doc.rect(PAGE_MARGIN, y, totalW, 16).fill("#f5f5f5");
       }
 
       doc.font("Helvetica").fontSize(9).fillColor(DARK);
-      doc.text(s.nombre || "-", COL.servicio.x, y + 3, { width: COL.servicio.w,  lineBreak: false });
-      doc.text(`$${precio.toFixed(2)}`, COL.precio.x,    y + 3, { width: COL.precio.w,   lineBreak: false, align: "right" });
-      doc.text(String(pax),             COL.pax.x,       y + 3, { width: COL.pax.w,      lineBreak: false, align: "center" });
-      doc.text(`$${subtotal.toFixed(2)}`, COL.subtotal.x, y + 3, { width: COL.subtotal.w, lineBreak: false, align: "right" });
+      doc.text(s.nombre || "-",            COL.servicio.x, y + 3, { width: COL.servicio.w, lineBreak: false });
+      doc.text(`$${precio.toFixed(2)}`,    COL.precio.x,   y + 3, { width: COL.precio.w,   lineBreak: false, align: "right" });
+      doc.text(String(pax),                COL.pax.x,      y + 3, { width: COL.pax.w,      lineBreak: false, align: "center" });
+      doc.text(`$${subtotal.toFixed(2)}`,  COL.subtotal.x, y + 3, { width: COL.subtotal.w, lineBreak: false, align: "right" });
 
       y += 16;
     });
@@ -325,12 +323,11 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
       .stroke();
     y += 5;
 
-    // Fila TOTAL — estilo negrita, alineado a la derecha igual que el detalle financiero
+    // Fila TOTAL — alineada a la derecha, misma tipografía que detalle financiero
     doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
     doc.text(
       `TOTAL SERVICIOS:  $${totalServicios.toFixed(2)}`,
-      PAGE_MARGIN,
-      y,
+      PAGE_MARGIN, y,
       { width: totalW, align: "right", lineBreak: false }
     );
     y = doc.y + 10;
@@ -431,16 +428,16 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   y = sectionHeader(doc, y, "Detalle financiero", pageWidth);
   y += 8;
 
-  const subtotal      = Number(evento.subtotal            || 0);
-  const iva           = Number(evento.iva                 || 0);
-  const total         = Number(evento.total               || 0);
-  const montoAnticipo = Number(evento.monto_anticipo       || 0);
-  const restante      = Number(evento.restante            || 0);
-  const pctAnticipo   = evento.porcentaje_anticipo         || 0;
+  const subtotal      = Number(evento.subtotal              || 0);
+  const iva           = Number(evento.iva                   || 0);
+  const total         = Number(evento.total                 || 0);
+  const montoAnticipo = Number(evento.monto_anticipo         || 0);
+  const restante      = Number(evento.restante              || 0);
+  const pctAnticipo   = evento.porcentaje_anticipo           || 0;
 
   const finItems = [
-    ["SUBTOTAL",   `$${subtotal.toFixed(2)}`],
-    ["IVA (16%)",  `$${iva.toFixed(2)}`],
+    ["SUBTOTAL",  `$${subtotal.toFixed(2)}`],
+    ["IVA (16%)", `$${iva.toFixed(2)}`],
   ];
 
   for (const [lbl, val] of finItems) {
