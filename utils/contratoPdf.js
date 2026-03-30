@@ -258,67 +258,89 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 8;
 
- // ── DETALLE DE MENÚ (FORMATO TIPO CONTRATO REAL) ───────────────────────
-if (servicios.length > 0) {
-  y = checkPageBreak(doc, y, 100);
+  // ── DETALLE DE MENÚ ────────────────────────────────────────────────────────
+  if (servicios.length > 0) {
+    y = checkPageBreak(doc, y, 100);
 
-  // Título
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
-  doc.text("DESCRIPCIÓN DEL MENÚ", PAGE_MARGIN, y);
-  y = doc.y + 8;
+    // Título con mismo estilo que todas las secciones
+    y = sectionHeader(doc, y, "Descripción del menú", pageWidth);
+    y += 8;
 
-  servicios.forEach(servicio => {
-    y = checkPageBreak(doc, y, 80);
+    // Columnas numéricas (derecha de la página)
+    const nombreW = totalW * 0.50;   // ancho para la parte izquierda (nombre + secciones)
+    const cColW   = 58;
+    const cPreX   = PAGE_MARGIN + totalW * 0.55;
+    const cPaxX   = PAGE_MARGIN + totalW * 0.70;
+    const cSubX   = PAGE_MARGIN + totalW * 0.83;
 
-    // 🔹 Nombre del servicio (DESAYUNO, COMIDA, etc.)
-    doc.font("Helvetica-Bold").fontSize(10).fillColor(DARK);
-    doc.text(`${servicio.nombre.toUpperCase()}:`, PAGE_MARGIN, y);
-    y = doc.y + 4;
+    // Encabezado naranja de columnas (igual a la imagen de referencia)
+    doc.rect(cPreX, y, cColW * 3 + 4, 14).fill("#f4b183");
+    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8);
+    doc.text("PRECIO",   cPreX, y + 3, { width: cColW, align: "center", lineBreak: false });
+    doc.text("PAX",      cPaxX, y + 3, { width: cColW, align: "center", lineBreak: false });
+    doc.text("SUBTOTAL", cSubX, y + 3, { width: cColW, align: "center", lineBreak: false });
+    y += 20;
 
-    // 🔹 Secciones (INCLUYE, PLATOS FUERTES, etc.)
-    if (servicio.secciones) {
-      for (const [seccion, items] of Object.entries(servicio.secciones)) {
+    servicios.forEach((servicio) => {
+      y = checkPageBreak(doc, y, 50);
 
-        // Nombre sección
-        doc.font("Helvetica-Bold").fontSize(8).fillColor("#2e7d32");
-        doc.text(seccion.toUpperCase(), PAGE_MARGIN + 10, y);
-        y = doc.y + 2;
+      const precio    = Number(servicio.precio_unitario || 0);
+      const pax       = Number(evento.numero_personas   || 0);
+      const subtotalS = precio * pax;
 
-        // Línea
-        doc.moveTo(PAGE_MARGIN + 10, y)
-           .lineTo(pageWidth - PAGE_MARGIN, y)
-           .strokeColor("#aaaaaa")
-           .lineWidth(0.5)
-           .stroke();
+      // ── Fila: nombre del servicio (izquierda) + números (derecha) en la misma Y ──
+      const rowY = y;
 
-        y += 4;
+      // Nombre del servicio — bold, alineado verticalmente con los números
+      doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
+      doc.text(
+        `${servicio.nombre.toUpperCase()}:`,
+        PAGE_MARGIN,
+        rowY,
+        { width: nombreW, lineBreak: false }
+      );
 
-        // Items
-        doc.font("Helvetica").fontSize(9).fillColor(DARK);
-        doc.text(items.join(", "), PAGE_MARGIN + 10, y, {
-          width: totalW - 20
-        });
+      // Números en exactamente la misma Y que el nombre
+      doc.font("Helvetica").fontSize(9).fillColor(DARK);
+      doc.text(`$${precio.toFixed(2)}`,    cPreX, rowY, { width: cColW, align: "center", lineBreak: false });
+      doc.text(`${pax}`,                   cPaxX, rowY, { width: cColW, align: "center", lineBreak: false });
+      doc.text(`$${subtotalS.toFixed(2)}`, cSubX, rowY, { width: cColW, align: "center", lineBreak: false });
 
-        y = doc.y + 6;
+      y = rowY + 16;
+
+      // ── Secciones del menú (debajo del nombre, solo lado izquierdo) ───────
+      if (servicio.secciones && Object.keys(servicio.secciones).length > 0) {
+        for (const [seccion, items] of Object.entries(servicio.secciones)) {
+          y = checkPageBreak(doc, y, 28);
+
+          // Cabecera de subsección con fondo gris claro
+          doc.rect(PAGE_MARGIN, y, nombreW, 13).fill(GRAY_SECTION);
+          doc.fillColor(DARK).font("Helvetica-Bold").fontSize(7.5);
+          doc.text(seccion.toUpperCase(), PAGE_MARGIN + 4, y + 3, {
+            width: nombreW - 8,
+            lineBreak: false,
+          });
+          y += 14;
+
+          // Listado de ítems
+          doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+          doc.text(items.join(", "), PAGE_MARGIN + 4, y, { width: nombreW - 8 });
+          y = doc.y + 5;
+        }
       }
-    }
 
-    // 🔹 Precio / PAX / subtotal (alineado a la derecha)
-    const precio = Number(servicio.precio_unitario || 0);
-    const pax = Number(servicio.cantidad_personas || 0);
-    const subtotal = precio * pax;
+      // Línea separadora entre servicios (ancho completo)
+      doc
+        .moveTo(PAGE_MARGIN, y)
+        .lineTo(pageWidth - PAGE_MARGIN, y)
+        .strokeColor("#aaaaaa")
+        .lineWidth(0.5)
+        .stroke();
+      y += 8;
+    });
 
-    doc.font("Helvetica").fontSize(9).fillColor(DARK);
-
-    doc.text(`$ ${precio.toFixed(2)}`, PAGE_MARGIN + totalW * 0.55, y, { continued: true });
-    doc.text(`   ${pax}`, { continued: true });
-    doc.text(`   $ ${subtotal.toFixed(2)}`);
-
-    y = doc.y + 12;
-  });
-
-  y += 10;
-}
+    y += 4;
+  }
 
   // ── DESCRIPCIÓN DEL MONTAJE ───────────────────────────────────────────────
   y = checkPageBreak(doc, y, 50);
@@ -332,6 +354,21 @@ if (servicios.length > 0) {
   doc.font("Helvetica").fontSize(9).fillColor(DARK);
   doc.text(evento.especificaciones_montaje || "No especificado", PAGE_MARGIN + 4, y + 4, { width: totalW - 8 });
   y = doc.y + 10;
+  
+  // ── OBSERVACIONES ─────────────────────────────────────────────
+y = checkPageBreak(doc, y, 40);
+
+doc.font("Helvetica-Bold").fontSize(8).fillColor("#555555");
+doc.text("OBSERVACIONES:", PAGE_MARGIN + 4, y);
+
+y += 10;
+
+doc.font("Helvetica").fontSize(9).fillColor(DARK);
+doc.text(evento.observaciones || "Sin observaciones", PAGE_MARGIN + 4, y, {
+  width: totalW - 8
+});
+
+y = doc.y + 10;
 
   // ── SERVICIOS COMPLEMENTARIOS ─────────────────────────────────────────────
   y = checkPageBreak(doc, y, 80);
