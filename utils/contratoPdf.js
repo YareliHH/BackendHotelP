@@ -6,6 +6,9 @@ const GRAY_HEADER  = "#d0d0d0";
 const GRAY_SECTION = "#e8e8e8";
 const BLACK        = "#000000";
 const DARK         = "#1a1a1a";
+const ORANGE       = "#f4b183";
+const ORANGE_DARK  = "#c0704a";
+const ORANGE_LIGHT = "#fdf3ec";
 const PAGE_MARGIN  = 40;
 const COL_GAP      = 12;
 
@@ -197,10 +200,31 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 6;
 
+    // RFC + MÉTODO DE PAGO
   y = twoColumns(
     doc, y, pageWidth,
-    (d, x, sy, w) => { labelValue(d, x, sy, w, "R.F.C", evento.rfc); return d.y; },
-    (d, x, sy, w) => { labelValue(d, x, sy, w, "Método de pago", evento.metodo_pago); return d.y; }
+    (d, x, sy, w) => { 
+      labelValue(d, x, sy, w, "R.F.C", evento.rfc); 
+      return d.y; 
+    },
+    (d, x, sy, w) => { 
+      labelValue(d, x, sy, w, "Método de pago", evento.metodo_pago); 
+      return d.y; 
+    }
+  );
+  y += 6;
+
+  // CUENTA MAESTRA + FACTURA 
+  y = twoColumns(
+    doc, y, pageWidth,
+    (d, x, sy, w) => { 
+      labelValue(d, x, sy, w, "Cuenta maestra", evento.cuenta_maestra); 
+      return d.y; 
+    },
+    (d, x, sy, w) => { 
+      labelValue(d, x, sy, w, "Factura", evento.factura); 
+      return d.y; 
+    }
   );
   y += 8;
 
@@ -258,28 +282,68 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 8;
 
+  y = twoColumns(
+    doc, y, pageWidth,
+    (d, x, sy, w) => { labelValue(d, x, sy, w, "Tipo de servicio", evento.tipo_servicio); return d.y; },
+    (d, x, sy, w) => { return d.y; }
+  );
+  y += 6;
+
   // ── DETALLE DE MENÚ ────────────────────────────────────────────────────────
   if (servicios.length > 0) {
     y = checkPageBreak(doc, y, 100);
 
-    // Título con mismo estilo que todas las secciones
+    // Título con el mismo estilo que sectionHeader
     y = sectionHeader(doc, y, "Descripción del menú", pageWidth);
-    y += 8;
+    y += 4;
 
-    // Columnas numéricas (derecha de la página)
-    const nombreW = totalW * 0.50;   // ancho para la parte izquierda (nombre + secciones)
-    const cColW   = 58;
-    const cPreX   = PAGE_MARGIN + totalW * 0.55;
-    const cPaxX   = PAGE_MARGIN + totalW * 0.70;
-    const cSubX   = PAGE_MARGIN + totalW * 0.83;
+    // ── Dimensiones de columnas ─────────────────────────────────────────────
+    const nombreW = totalW * 0.50;
+    const cColW   = Math.floor((totalW - nombreW) / 3); // ancho uniforme de cada col numérica
+    const cPreX   = PAGE_MARGIN + nombreW;
+    const cPaxX   = cPreX + cColW;
+    const cSubX   = cPaxX + cColW;
+    const tableR  = PAGE_MARGIN + totalW;               // borde derecho exacto
 
-    // Encabezado naranja de columnas (igual a la imagen de referencia)
-    doc.rect(cPreX, y, cColW * 3 + 4, 14).fill("#f4b183");
-    doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8);
-    doc.text("PRECIO",   cPreX, y + 3, { width: cColW, align: "center", lineBreak: false });
-    doc.text("PAX",      cPaxX, y + 3, { width: cColW, align: "center", lineBreak: false });
-    doc.text("SUBTOTAL", cSubX, y + 3, { width: cColW, align: "center", lineBreak: false });
-    y += 20;
+    // ── Encabezado naranja con divisores y borde ────────────────────────────
+    const HDR_H = 16;
+
+    // Fondo naranja solo en zona de las 3 columnas numéricas
+    doc.rect(cPreX, y, tableR - cPreX, HDR_H).fill(ORANGE);
+
+    // Líneas divisorias verticales entre columnas
+    [cPaxX, cSubX].forEach((divX) => {
+      doc
+        .moveTo(divX, y)
+        .lineTo(divX, y + HDR_H)
+        .strokeColor(ORANGE_DARK)
+        .lineWidth(0.6)
+        .stroke();
+    });
+
+    // Borde exterior del encabezado naranja
+    doc
+      .rect(cPreX, y, tableR - cPreX, HDR_H)
+      .strokeColor(ORANGE_DARK)
+      .lineWidth(0.6)
+      .stroke();
+
+    // Textos de encabezado
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
+    ["PRECIO", "PAX", "SUBTOTAL"].forEach((lbl, i) => {
+      const xs = [cPreX, cPaxX, cSubX];
+      doc.text(lbl, xs[i] + 2, y + 4, {
+        width: cColW - 4,
+        align: "center",
+        lineBreak: false,
+      });
+    });
+
+    y += HDR_H + 2;
+
+    // ── Filas de servicios ──────────────────────────────────────────────────
+    let totalGlobal = 0;
+    let rowIndex    = 0;
 
     servicios.forEach((servicio) => {
       y = checkPageBreak(doc, y, 50);
@@ -287,28 +351,51 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
       const precio    = Number(servicio.precio_unitario || 0);
       const pax       = Number(evento.numero_personas   || 0);
       const subtotalS = precio * pax;
+      totalGlobal    += subtotalS;
 
-      // ── Fila: nombre del servicio (izquierda) + números (derecha) en la misma Y ──
-      const rowY = y;
+      const ROW_H  = 18;
+      const ROW_BG = rowIndex % 2 === 0 ? ORANGE_LIGHT : "#ffffff"; // zebra naranja pálido / blanco
+      rowIndex++;
 
-      // Nombre del servicio — bold, alineado verticalmente con los números
+      // Fondo de fila completa (ancho total)
+      doc.rect(PAGE_MARGIN, y, totalW, ROW_H).fill(ROW_BG);
+
+      // Borde inferior de fila
+      doc
+        .moveTo(PAGE_MARGIN, y + ROW_H)
+        .lineTo(tableR, y + ROW_H)
+        .strokeColor("#e0c0aa")
+        .lineWidth(0.4)
+        .stroke();
+
+      // Líneas divisorias verticales en la zona de columnas (mismas que encabezado)
+      [cPaxX, cSubX].forEach((divX) => {
+        doc
+          .moveTo(divX, y)
+          .lineTo(divX, y + ROW_H)
+          .strokeColor("#e0c0aa")
+          .lineWidth(0.4)
+          .stroke();
+      });
+
+      // Nombre del servicio — izquierda, centrado verticalmente en la fila
+      const textY = y + (ROW_H - 9) / 2;
       doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
       doc.text(
         `${servicio.nombre.toUpperCase()}:`,
-        PAGE_MARGIN,
-        rowY,
-        { width: nombreW, lineBreak: false }
+        PAGE_MARGIN + 4, textY,
+        { width: nombreW - 8, lineBreak: false }
       );
 
-      // Números en exactamente la misma Y que el nombre
+      // Números centrados en cada columna
       doc.font("Helvetica").fontSize(9).fillColor(DARK);
-      doc.text(`$${precio.toFixed(2)}`,    cPreX, rowY, { width: cColW, align: "center", lineBreak: false });
-      doc.text(`${pax}`,                   cPaxX, rowY, { width: cColW, align: "center", lineBreak: false });
-      doc.text(`$${subtotalS.toFixed(2)}`, cSubX, rowY, { width: cColW, align: "center", lineBreak: false });
+      doc.text(`$${precio.toFixed(2)}`,    cPreX, textY, { width: cColW, align: "center", lineBreak: false });
+      doc.text(`${pax}`,                   cPaxX, textY, { width: cColW, align: "center", lineBreak: false });
+      doc.text(`$${subtotalS.toFixed(2)}`, cSubX, textY, { width: cColW, align: "center", lineBreak: false });
 
-      y = rowY + 16;
+      y += ROW_H + 2;
 
-      // ── Secciones del menú (debajo del nombre, solo lado izquierdo) ───────
+      // ── Secciones del menú (detalle, solo columna izquierda) ─────────────
       if (servicio.secciones && Object.keys(servicio.secciones).length > 0) {
         for (const [seccion, items] of Object.entries(servicio.secciones)) {
           y = checkPageBreak(doc, y, 28);
@@ -328,18 +415,39 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
           y = doc.y + 5;
         }
       }
-
-      // Línea separadora entre servicios (ancho completo)
-      doc
-        .moveTo(PAGE_MARGIN, y)
-        .lineTo(pageWidth - PAGE_MARGIN, y)
-        .strokeColor("#aaaaaa")
-        .lineWidth(0.5)
-        .stroke();
-      y += 8;
     });
 
-    y += 4;
+    // ── Fila TOTAL al final de la tabla ────────────────────────────────────
+    y = checkPageBreak(doc, y, 20);
+    const TOT_H = 16;
+
+    // Fondo gris oscuro en zona de columnas numéricas (igual a sectionHeader)
+    doc.rect(cPreX, y, tableR - cPreX, TOT_H).fill(GRAY_HEADER);
+
+    // Borde exterior fila total
+    doc
+      .rect(cPreX, y, tableR - cPreX, TOT_H)
+      .strokeColor("#999999")
+      .lineWidth(0.5)
+      .stroke();
+
+    // Etiqueta "TOTAL" a la izquierda de la zona naranja, alineada a la derecha
+    doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
+    doc.text("TOTAL:", PAGE_MARGIN + 4, y + 4, {
+      width: nombreW - 8,
+      align: "right",
+      lineBreak: false,
+    });
+
+    // Valor total en la columna SUBTOTAL
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
+    doc.text(`$${totalGlobal.toFixed(2)}`, cSubX, y + 4, {
+      width: cColW,
+      align: "center",
+      lineBreak: false,
+    });
+
+    y += TOT_H + 8;
   }
 
   // ── DESCRIPCIÓN DEL MONTAJE ───────────────────────────────────────────────
@@ -354,21 +462,17 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   doc.font("Helvetica").fontSize(9).fillColor(DARK);
   doc.text(evento.especificaciones_montaje || "No especificado", PAGE_MARGIN + 4, y + 4, { width: totalW - 8 });
   y = doc.y + 10;
-  
-  // ── OBSERVACIONES ─────────────────────────────────────────────
-y = checkPageBreak(doc, y, 40);
 
-doc.font("Helvetica-Bold").fontSize(8).fillColor("#555555");
-doc.text("OBSERVACIONES:", PAGE_MARGIN + 4, y);
+  // ── OBSERVACIONES ─────────────────────────────────────────────────────────
+  y = checkPageBreak(doc, y, 40);
 
-y += 10;
+  doc.font("Helvetica-Bold").fontSize(8).fillColor("#555555");
+  doc.text("OBSERVACIONES:", PAGE_MARGIN + 4, y);
+  y += 10;
 
-doc.font("Helvetica").fontSize(9).fillColor(DARK);
-doc.text(evento.observaciones || "Sin observaciones", PAGE_MARGIN + 4, y, {
-  width: totalW - 8
-});
-
-y = doc.y + 10;
+  doc.font("Helvetica").fontSize(9).fillColor(DARK);
+  doc.text(evento.observaciones || "Sin observaciones", PAGE_MARGIN + 4, y, { width: totalW - 8 });
+  y = doc.y + 10;
 
   // ── SERVICIOS COMPLEMENTARIOS ─────────────────────────────────────────────
   y = checkPageBreak(doc, y, 80);
@@ -380,14 +484,14 @@ y = doc.y + 10;
   y += 14 + 6;
 
   const serviciosComp = [
-    ["EQUIPO AUDIOVISUAL",    evento.equipo_audiovisual],
-    ["DECORACIÓN",            evento.decoracion],
-    ["GUARDARROPA",           evento.guardarropa],
-    ["USO SALÓN",             evento.uso_salon],
-    ["USO MOBILIARIO",        evento.uso_mobiliario],
-    ["SERVICIO MESEROS",      evento.servicio_meseros],
-    ["USO ESTACIONAMIENTO",   evento.uso_estacionamiento],
-    ["OTROS",                 evento.otros_servicios],
+    ["EQUIPO AUDIOVISUAL",  evento.equipo_audiovisual],
+    ["DECORACIÓN",          evento.decoracion],
+    ["GUARDARROPA",         evento.guardarropa],
+    ["USO SALÓN",           evento.uso_salon],
+    ["USO MOBILIARIO",      evento.uso_mobiliario],
+    ["SERVICIO MESEROS",    evento.servicio_meseros],
+    ["USO ESTACIONAMIENTO", evento.uso_estacionamiento],
+    ["OTROS",               evento.otros_servicios],
   ];
 
   const mid        = Math.ceil(serviciosComp.length / 2);

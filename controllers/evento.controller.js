@@ -120,7 +120,7 @@ export const obtenerResumen = async (req, res) => {
   }
 };
 
-//////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
 // 🔥 GENERAR CONTRATO PDF (YA CON HOTEL Y SERVICIOS)
 //////////////////////////////////////////////////////
 export const generarContrato = async (req, res) => {
@@ -148,7 +148,7 @@ export const generarContrato = async (req, res) => {
     );
     const hotel = hotelRows[0];
 
-    // 🔥 3. TRAER SERVICIOS + ITEMS + SECCIONES (YA CORRECTO)
+    // 🔥 3. TRAER SERVICIOS + ITEMS + SECCIONES
     const [rows] = await db.promise().query(
       `SELECT 
         es.id_evento_servicio,
@@ -170,7 +170,7 @@ export const generarContrato = async (req, res) => {
       [id]
     );
 
-    // 🔥 4. AGRUPAR SERVICIOS + SECCIONES + ITEMS
+    // 🔥 4. AGRUPAR (AQUÍ ESTÁ LA CORRECCIÓN IMPORTANTE)
     const servicios = [];
 
     rows.forEach(row => {
@@ -189,12 +189,16 @@ export const generarContrato = async (req, res) => {
         servicios.push(servicio);
       }
 
-      // 👇 AGRUPAR ITEMS POR SECCIÓN
-      if (row.item) {
+      // ✅ CREAR SECCIÓN SIEMPRE (aunque no tenga items)
+      if (row.seccion) {
         if (!servicio.secciones[row.seccion]) {
           servicio.secciones[row.seccion] = [];
         }
-        servicio.secciones[row.seccion].push(row.item);
+
+        // ✅ SOLO agregar item si existe
+        if (row.item) {
+          servicio.secciones[row.seccion].push(row.item);
+        }
       }
     });
 
