@@ -148,20 +148,57 @@ export const generarContrato = async (req, res) => {
     );
     const hotel = hotelRows[0];
 
-    // 🔥 3. TRAER SERVICIOS (AQUÍ ESTABA LO QUE TE FALTABA)
-    const [servicios] = await db.promise().query(
+    // 🔥 3. TRAER SERVICIOS + ITEMS + SECCIONES (YA CORRECTO)
+    const [rows] = await db.promise().query(
       `SELECT 
+        es.id_evento_servicio,
         s.nombre,
         s.precio_unitario,
-        es.cantidad_personas
-       FROM evento_servicios es
-       INNER JOIN servicios s 
-         ON s.id_servicio = es.id_servicio
-       WHERE es.id_evento = ?`,
+        es.cantidad_personas,
+        si.nombre AS item,
+        ss.titulo AS seccion
+      FROM evento_servicios es
+      INNER JOIN servicios s 
+        ON s.id_servicio = es.id_servicio
+      LEFT JOIN evento_servicio_items esi 
+        ON esi.id_evento_servicio = es.id_evento_servicio
+      LEFT JOIN servicio_items si 
+        ON si.id_item = esi.id_item
+      LEFT JOIN servicio_secciones ss
+        ON ss.id_seccion = si.id_seccion
+      WHERE es.id_evento = ?`,
       [id]
     );
 
-    // 🔹 4. ENVIAR TODO AL PDF
+    // 🔥 4. AGRUPAR SERVICIOS + SECCIONES + ITEMS
+    const servicios = [];
+
+    rows.forEach(row => {
+      let servicio = servicios.find(
+        s => s.id_evento_servicio === row.id_evento_servicio
+      );
+
+      if (!servicio) {
+        servicio = {
+          id_evento_servicio: row.id_evento_servicio,
+          nombre: row.nombre,
+          precio_unitario: row.precio_unitario,
+          cantidad_personas: row.cantidad_personas,
+          secciones: {}
+        };
+        servicios.push(servicio);
+      }
+
+      // 👇 AGRUPAR ITEMS POR SECCIÓN
+      if (row.item) {
+        if (!servicio.secciones[row.seccion]) {
+          servicio.secciones[row.seccion] = [];
+        }
+        servicio.secciones[row.seccion].push(row.item);
+      }
+    });
+
+    // 🔹 5. ENVIAR AL PDF
     generarContratoPDF(res, evento, hotel, servicios);
 
   } catch (error) {

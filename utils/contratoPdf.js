@@ -258,80 +258,67 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 8;
 
-  // ── TABLA DE SERVICIOS CONTRATADOS ────────────────────────────────────────
-  if (servicios.length > 0) {
-    y = checkPageBreak(doc, y, 40 + servicios.length * 18);
+ // ── DETALLE DE MENÚ (FORMATO TIPO CONTRATO REAL) ───────────────────────
+if (servicios.length > 0) {
+  y = checkPageBreak(doc, y, 100);
 
-    // Encabezado de sección — mismo estilo GRAY_HEADER que el resto
-    y = sectionHeader(doc, y, "Servicios contratados", pageWidth);
-    y += 6;
+  // Título
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
+  doc.text("DESCRIPCIÓN DEL MENÚ", PAGE_MARGIN, y);
+  y = doc.y + 8;
 
-    // Definición de columnas
-    const COL = {
-      servicio: { x: PAGE_MARGIN,                        w: totalW * 0.45 },
-      precio:   { x: PAGE_MARGIN + totalW * 0.45 + 4,   w: totalW * 0.18 },
-      pax:      { x: PAGE_MARGIN + totalW * 0.63 + 4,   w: totalW * 0.12 },
-      subtotal: { x: PAGE_MARGIN + totalW * 0.75 + 4,   w: totalW * 0.25 },
-    };
+  servicios.forEach(servicio => {
+    y = checkPageBreak(doc, y, 80);
 
-    // Cabecera de columnas — fondo GRAY_SECTION (igual que sub-cabeceras del resto del doc)
-    doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
-    doc.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
-    doc.text("SERVICIO",  COL.servicio.x, y + 4, { width: COL.servicio.w, lineBreak: false });
-    doc.text("PRECIO",    COL.precio.x,   y + 4, { width: COL.precio.w,   lineBreak: false, align: "right" });
-    doc.text("PAX",       COL.pax.x,      y + 4, { width: COL.pax.w,      lineBreak: false, align: "center" });
-    doc.text("SUBTOTAL",  COL.subtotal.x, y + 4, { width: COL.subtotal.w, lineBreak: false, align: "right" });
-    y += 14;
+    // 🔹 Nombre del servicio (DESAYUNO, COMIDA, etc.)
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(DARK);
+    doc.text(`${servicio.nombre.toUpperCase()}:`, PAGE_MARGIN, y);
+    y = doc.y + 4;
 
-    // Línea bajo la cabecera
-    doc
-      .moveTo(PAGE_MARGIN, y)
-      .lineTo(pageWidth - PAGE_MARGIN, y)
-      .strokeColor("#aaaaaa")
-      .lineWidth(0.5)
-      .stroke();
-    y += 4;
+    // 🔹 Secciones (INCLUYE, PLATOS FUERTES, etc.)
+    if (servicio.secciones) {
+      for (const [seccion, items] of Object.entries(servicio.secciones)) {
 
-    // Filas de servicios con fondo alternado sutil
-    let totalServicios = 0;
+        // Nombre sección
+        doc.font("Helvetica-Bold").fontSize(8).fillColor("#2e7d32");
+        doc.text(seccion.toUpperCase(), PAGE_MARGIN + 10, y);
+        y = doc.y + 2;
 
-    servicios.forEach((s, i) => {
-      const precio   = Number(s.precio_unitario   || 0);
-      const pax      = Number(s.cantidad_personas || 0);
-      const subtotal = precio * pax;
-      totalServicios += subtotal;
+        // Línea
+        doc.moveTo(PAGE_MARGIN + 10, y)
+           .lineTo(pageWidth - PAGE_MARGIN, y)
+           .strokeColor("#aaaaaa")
+           .lineWidth(0.5)
+           .stroke();
 
-      if (i % 2 === 1) {
-        doc.rect(PAGE_MARGIN, y, totalW, 16).fill("#f5f5f5");
+        y += 4;
+
+        // Items
+        doc.font("Helvetica").fontSize(9).fillColor(DARK);
+        doc.text(items.join(", "), PAGE_MARGIN + 10, y, {
+          width: totalW - 20
+        });
+
+        y = doc.y + 6;
       }
+    }
 
-      doc.font("Helvetica").fontSize(9).fillColor(DARK);
-      doc.text(s.nombre || "-",            COL.servicio.x, y + 3, { width: COL.servicio.w, lineBreak: false });
-      doc.text(`$${precio.toFixed(2)}`,    COL.precio.x,   y + 3, { width: COL.precio.w,   lineBreak: false, align: "right" });
-      doc.text(String(pax),                COL.pax.x,      y + 3, { width: COL.pax.w,      lineBreak: false, align: "center" });
-      doc.text(`$${subtotal.toFixed(2)}`,  COL.subtotal.x, y + 3, { width: COL.subtotal.w, lineBreak: false, align: "right" });
+    // 🔹 Precio / PAX / subtotal (alineado a la derecha)
+    const precio = Number(servicio.precio_unitario || 0);
+    const pax = Number(servicio.cantidad_personas || 0);
+    const subtotal = precio * pax;
 
-      y += 16;
-    });
+    doc.font("Helvetica").fontSize(9).fillColor(DARK);
 
-    // Línea antes del total
-    doc
-      .moveTo(PAGE_MARGIN, y)
-      .lineTo(pageWidth - PAGE_MARGIN, y)
-      .strokeColor("#aaaaaa")
-      .lineWidth(0.5)
-      .stroke();
-    y += 5;
+    doc.text(`$ ${precio.toFixed(2)}`, PAGE_MARGIN + totalW * 0.55, y, { continued: true });
+    doc.text(`   ${pax}`, { continued: true });
+    doc.text(`   $ ${subtotal.toFixed(2)}`);
 
-    // Fila TOTAL — alineada a la derecha, misma tipografía que detalle financiero
-    doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
-    doc.text(
-      `TOTAL SERVICIOS:  $${totalServicios.toFixed(2)}`,
-      PAGE_MARGIN, y,
-      { width: totalW, align: "right", lineBreak: false }
-    );
-    y = doc.y + 10;
-  }
+    y = doc.y + 12;
+  });
+
+  y += 10;
+}
 
   // ── DESCRIPCIÓN DEL MONTAJE ───────────────────────────────────────────────
   y = checkPageBreak(doc, y, 50);
