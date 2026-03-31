@@ -244,3 +244,20 @@ export const eliminarEvento = async (req, res) => {
     res.status(500).json({ error: "Error al eliminar evento" });
   }
 };
+//////////////////////////////////////////////////////
+// ACTUALIZAR EVENTO (CONTROLLER)
+//////////////////////////////////////////////////////
+
+export const actualizarEvento = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    await Evento.actualizarEvento(id, data);
+
+    res.json({ message: "Evento actualizado correctamente" });
+  } catch (error) {
+    console.error("Error al actualizar:", error);
+    res.status(500).json({ error: "Error al actualizar evento" });
+  }
+};

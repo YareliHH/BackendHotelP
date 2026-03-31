@@ -94,7 +94,8 @@ const getResumen = async () => {
   const [rows] = await db.promise().query(`
     SELECT 
       (SELECT COUNT(*) FROM eventos) AS totalEventos,
-      (SELECT COUNT(*) FROM salones) AS salonesTotales
+      (SELECT COUNT(*) FROM salones) AS salonesTotales,
+      (SELECT SUM(total) FROM eventos) AS ingresos
   `);
 
   return rows[0];
@@ -121,6 +122,16 @@ const eliminarEvento = async (idEvento) => {
     [idEvento]
   );
 };
+//////////////////////////////////////////////////////
+// ACTUALIZAR EVENTO (MODEL)
+//////////////////////////////////////////////////////
+
+const actualizarEvento = async (idEvento, data) => {
+  await db.promise().query(
+    "UPDATE eventos SET ? WHERE id_evento = ?",
+    [data, idEvento]
+  );
+};
 
 //////////////////////////////////////////////////////
 // EXPORT
@@ -134,5 +145,6 @@ export default {
   getEventos,
   getResumen,
   finalizarEvento,
-  eliminarEvento// 👈 AGREGA ESTO
+  eliminarEvento,
+  actualizarEvento // AGREGA ESTO
 };
