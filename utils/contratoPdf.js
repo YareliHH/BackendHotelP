@@ -9,10 +9,81 @@ const DARK         = "#1a1a1a";
 const ORANGE       = "#f4b183";
 const ORANGE_DARK  = "#c0704a";
 const ORANGE_LIGHT = "#fdf3ec";
+const RED          = "#b71c1c";
+const RED_LIGHT    = "#FFEBEE";
+const BLUE         = "#1565C0";
 const PAGE_MARGIN  = 40;
 const COL_GAP      = 12;
 
 const LOGO_PATH = path.join(__dirname, "../assets/logotipoP.png");
+
+// ─── Número a Letras (español) ───────────────────────────────────────────────
+
+const UNIDADES = [
+  "", "UN", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE",
+  "DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS",
+  "DIECISIETE", "DIECIOCHO", "DIECINUEVE", "VEINTE",
+];
+const DECENAS = [
+  "", "", "VEINTI", "TREINTA", "CUARENTA", "CINCUENTA",
+  "SESENTA", "SETENTA", "OCHENTA", "NOVENTA",
+];
+const CENTENAS = [
+  "", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS",
+  "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS",
+];
+
+function convertirGrupo(n) {
+  if (n === 0) return "";
+  if (n === 100) return "CIEN";
+  if (n <= 20) return UNIDADES[n];
+
+  const c = Math.floor(n / 100);
+  const d = Math.floor((n % 100) / 10);
+  const u = n % 10;
+
+  let resultado = c > 0 ? CENTENAS[c] + (n % 100 > 0 ? " " : "") : "";
+
+  if (d === 2 && u > 0) {
+    resultado += "VEINTI" + UNIDADES[u];
+  } else if (d >= 3) {
+    resultado += DECENAS[d];
+    if (u > 0) resultado += " Y " + UNIDADES[u];
+  } else if (d === 0 && u > 0) {
+    resultado += UNIDADES[u];
+  } else if (d > 0) {
+    resultado += UNIDADES[d * 10 + u] || (DECENAS[d] + (u > 0 ? " Y " + UNIDADES[u] : ""));
+  }
+
+  return resultado.trim();
+}
+
+function numeroALetras(num) {
+  if (!num || isNaN(num)) return "-";
+  const numero = Math.abs(Number(num));
+  const entero = Math.floor(numero);
+  const centavos = Math.round((numero - entero) * 100);
+
+  if (entero === 0) return `CERO PESOS ${centavos.toString().padStart(2, "0")}/100 M.N.`;
+
+  const millones   = Math.floor(entero / 1_000_000);
+  const miles      = Math.floor((entero % 1_000_000) / 1_000);
+  const cientos    = entero % 1_000;
+
+  let letras = "";
+
+  if (millones > 0) {
+    letras += (millones === 1 ? "UN MILLÓN" : convertirGrupo(millones) + " MILLONES") + " ";
+  }
+  if (miles > 0) {
+    letras += (miles === 1 ? "MIL" : convertirGrupo(miles) + " MIL") + " ";
+  }
+  if (cientos > 0) {
+    letras += convertirGrupo(cientos);
+  }
+
+  return `${letras.trim()} PESOS ${centavos.toString().padStart(2, "0")}/100 M.N.`;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -189,7 +260,7 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   y += 8;
 
   // ── SECCIÓN 2: DATOS PARA FACTURACIÓN ─────────────────────────────────────
-  y = checkPageBreak(doc, y, 80);
+  y = checkPageBreak(doc, y, 100);
   y = sectionHeader(doc, y, "2. Datos para facturación", pageWidth);
   y += 6;
 
@@ -200,30 +271,40 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 6;
 
-    // RFC + MÉTODO DE PAGO
   y = twoColumns(
     doc, y, pageWidth,
-    (d, x, sy, w) => { 
-      labelValue(d, x, sy, w, "R.F.C", evento.rfc); 
-      return d.y; 
-    },
-    (d, x, sy, w) => { 
-      labelValue(d, x, sy, w, "Método de pago", evento.metodo_pago); 
-      return d.y; 
-    }
+    (d, x, sy, w) => { labelValue(d, x, sy, w, "R.F.C", evento.rfc); return d.y; },
+    (d, x, sy, w) => { labelValue(d, x, sy, w, "Método de pago", evento.metodo_pago); return d.y; }
   );
   y += 6;
 
-  // CUENTA MAESTRA + FACTURA 
   y = twoColumns(
     doc, y, pageWidth,
-    (d, x, sy, w) => { 
-      labelValue(d, x, sy, w, "Cuenta maestra", evento.cuenta_maestra); 
-      return d.y; 
+    (d, x, sy, w) => {
+      d.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
+      d.text("CUENTA MAESTRA", x, sy, { width: w, lineBreak: false });
+
+      const cuentaStr = evento.cuenta_maestra ? String(evento.cuenta_maestra) : "-";
+      d.font("Helvetica-Bold").fontSize(9).fillColor(RED);
+      d.text(cuentaStr, x, sy + 10, { continued: Boolean(evento.extension_cuenta), lineBreak: false });
+
+      if (evento.extension_cuenta) {
+        d.font("Helvetica").fontSize(8).fillColor("#555555");
+        d.text(`  Ext. ${evento.extension_cuenta}`, { lineBreak: false });
+      }
+
+      return sy + 22;
     },
-    (d, x, sy, w) => { 
-      labelValue(d, x, sy, w, "Factura", evento.factura); 
-      return d.y; 
+    (d, x, sy, w) => {
+      d.font("Helvetica-Bold").fontSize(7).fillColor("#555555");
+      d.text("FACTURA", x, sy, { width: w, lineBreak: false });
+
+      const facturaVal = (evento.factura || "-").toString().toUpperCase().trim();
+
+      d.font("Helvetica-Bold").fontSize(9).fillColor(BLUE);
+      d.text(facturaVal, x, sy + 10, { width: w, lineBreak: false });
+
+      return sy + 22;
     }
   );
   y += 8;
@@ -244,6 +325,13 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
     { width: totalW }
   );
   y = doc.y + 8;
+
+  // ── Cálculo anticipado del total global de servicios ──────────────────────
+  const totalGlobal = servicios.reduce((acc, servicio) => {
+    const precio = Number(servicio.precio_unitario || 0);
+    const pax    = Number(evento.numero_personas   || 0);
+    return acc + precio * pax;
+  }, 0);
 
   // ── SECCIÓN 3: DATOS DEL EVENTO ───────────────────────────────────────────
   y = checkPageBreak(doc, y, 120);
@@ -289,29 +377,34 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   );
   y += 6;
 
+  y = twoColumns(
+    doc, y, pageWidth,
+    (d, x, sy, w) => {
+      labelValue(d, x, sy, w, "Cargo", `$${totalGlobal.toFixed(2)}`);
+      return d.y;
+    },
+    (d, x, sy, w) => { return d.y; }
+  );
+  y += 6;
+
   // ── DETALLE DE MENÚ ────────────────────────────────────────────────────────
   if (servicios.length > 0) {
     y = checkPageBreak(doc, y, 100);
 
-    // Título con el mismo estilo que sectionHeader
     y = sectionHeader(doc, y, "Descripción del menú", pageWidth);
     y += 4;
 
-    // ── Dimensiones de columnas ─────────────────────────────────────────────
     const nombreW = totalW * 0.50;
-    const cColW   = Math.floor((totalW - nombreW) / 3); // ancho uniforme de cada col numérica
+    const cColW   = Math.floor((totalW - nombreW) / 3);
     const cPreX   = PAGE_MARGIN + nombreW;
     const cPaxX   = cPreX + cColW;
     const cSubX   = cPaxX + cColW;
-    const tableR  = PAGE_MARGIN + totalW;               // borde derecho exacto
+    const tableR  = PAGE_MARGIN + totalW;
 
-    // ── Encabezado naranja con divisores y borde ────────────────────────────
     const HDR_H = 16;
 
-    // Fondo naranja solo en zona de las 3 columnas numéricas
     doc.rect(cPreX, y, tableR - cPreX, HDR_H).fill(ORANGE);
 
-    // Líneas divisorias verticales entre columnas
     [cPaxX, cSubX].forEach((divX) => {
       doc
         .moveTo(divX, y)
@@ -321,14 +414,12 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
         .stroke();
     });
 
-    // Borde exterior del encabezado naranja
     doc
       .rect(cPreX, y, tableR - cPreX, HDR_H)
       .strokeColor(ORANGE_DARK)
       .lineWidth(0.6)
       .stroke();
 
-    // Textos de encabezado
     doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
     ["PRECIO", "PAX", "SUBTOTAL"].forEach((lbl, i) => {
       const xs = [cPreX, cPaxX, cSubX];
@@ -341,9 +432,7 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
 
     y += HDR_H + 2;
 
-    // ── Filas de servicios ──────────────────────────────────────────────────
-    let totalGlobal = 0;
-    let rowIndex    = 0;
+    let rowIndex = 0;
 
     servicios.forEach((servicio) => {
       y = checkPageBreak(doc, y, 50);
@@ -351,16 +440,13 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
       const precio    = Number(servicio.precio_unitario || 0);
       const pax       = Number(evento.numero_personas   || 0);
       const subtotalS = precio * pax;
-      totalGlobal    += subtotalS;
 
       const ROW_H  = 18;
-      const ROW_BG = rowIndex % 2 === 0 ? ORANGE_LIGHT : "#ffffff"; // zebra naranja pálido / blanco
+      const ROW_BG = rowIndex % 2 === 0 ? ORANGE_LIGHT : "#ffffff";
       rowIndex++;
 
-      // Fondo de fila completa (ancho total)
       doc.rect(PAGE_MARGIN, y, totalW, ROW_H).fill(ROW_BG);
 
-      // Borde inferior de fila
       doc
         .moveTo(PAGE_MARGIN, y + ROW_H)
         .lineTo(tableR, y + ROW_H)
@@ -368,7 +454,6 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
         .lineWidth(0.4)
         .stroke();
 
-      // Líneas divisorias verticales en la zona de columnas (mismas que encabezado)
       [cPaxX, cSubX].forEach((divX) => {
         doc
           .moveTo(divX, y)
@@ -378,7 +463,6 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
           .stroke();
       });
 
-      // Nombre del servicio — izquierda, centrado verticalmente en la fila
       const textY = y + (ROW_H - 9) / 2;
       doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
       doc.text(
@@ -387,7 +471,6 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
         { width: nombreW - 8, lineBreak: false }
       );
 
-      // Números centrados en cada columna
       doc.font("Helvetica").fontSize(9).fillColor(DARK);
       doc.text(`$${precio.toFixed(2)}`,    cPreX, textY, { width: cColW, align: "center", lineBreak: false });
       doc.text(`${pax}`,                   cPaxX, textY, { width: cColW, align: "center", lineBreak: false });
@@ -395,12 +478,10 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
 
       y += ROW_H + 2;
 
-      // ── Secciones del menú (detalle, solo columna izquierda) ─────────────
       if (servicio.secciones && Object.keys(servicio.secciones).length > 0) {
         for (const [seccion, items] of Object.entries(servicio.secciones)) {
           y = checkPageBreak(doc, y, 28);
 
-          // Cabecera de subsección con fondo gris claro
           doc.rect(PAGE_MARGIN, y, nombreW, 13).fill(GRAY_SECTION);
           doc.fillColor(DARK).font("Helvetica-Bold").fontSize(7.5);
           doc.text(seccion.toUpperCase(), PAGE_MARGIN + 4, y + 3, {
@@ -409,7 +490,6 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
           });
           y += 14;
 
-          // Listado de ítems
           doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
           doc.text(items.join(", "), PAGE_MARGIN + 4, y, { width: nombreW - 8 });
           y = doc.y + 5;
@@ -417,21 +497,17 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
       }
     });
 
-    // ── Fila TOTAL al final de la tabla ────────────────────────────────────
+    // ── Fila TOTAL ──────────────────────────────────────────────────────────
     y = checkPageBreak(doc, y, 20);
     const TOT_H = 16;
 
-    // Fondo gris oscuro en zona de columnas numéricas (igual a sectionHeader)
     doc.rect(cPreX, y, tableR - cPreX, TOT_H).fill(GRAY_HEADER);
-
-    // Borde exterior fila total
     doc
       .rect(cPreX, y, tableR - cPreX, TOT_H)
       .strokeColor("#999999")
       .lineWidth(0.5)
       .stroke();
 
-    // Etiqueta "TOTAL" a la izquierda de la zona naranja, alineada a la derecha
     doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
     doc.text("TOTAL:", PAGE_MARGIN + 4, y + 4, {
       width: nombreW - 8,
@@ -439,7 +515,6 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
       lineBreak: false,
     });
 
-    // Valor total en la columna SUBTOTAL
     doc.font("Helvetica-Bold").fontSize(9).fillColor(DARK);
     doc.text(`$${totalGlobal.toFixed(2)}`, cSubX, y + 4, {
       width: cColW,
@@ -551,45 +626,179 @@ function generarContratoPDF(res, evento, hotel, servicios = []) {
   labelValue(doc, PAGE_MARGIN, y, totalW, "Horarios", hotel.horarios);
   y = doc.y + 8;
 
-  // ── DETALLE FINANCIERO ────────────────────────────────────────────────────
-  y = checkPageBreak(doc, y, 100);
-  y = sectionHeader(doc, y, "Detalle financiero", pageWidth);
-  y += 8;
+  // ── SECCIÓN FINANCIERA ────────────────────────────────────────────────────
+  y = checkPageBreak(doc, y, 160);
+  y += 6;
 
   const subtotal      = Number(evento.subtotal              || 0);
   const iva           = Number(evento.iva                   || 0);
   const total         = Number(evento.total                 || 0);
-  const montoAnticipo = Number(evento.monto_anticipo         || 0);
+  const montoAnticipo = Number(evento.monto_anticipo        || 0);
   const restante      = Number(evento.restante              || 0);
-  const pctAnticipo   = evento.porcentaje_anticipo           || 0;
+  const pctAnticipo   = evento.porcentaje_anticipo          || 0;
 
-  const finItems = [
-    ["SUBTOTAL",  `$${subtotal.toFixed(2)}`],
-    ["IVA (16%)", `$${iva.toFixed(2)}`],
-  ];
+  // ── FIX: total_en_letra se genera automáticamente si viene vacío ──────────
+  const totalEnLetra  = evento.total_en_letra
+    ? evento.total_en_letra
+    : numeroALetras(total);
 
-  for (const [lbl, val] of finItems) {
-    doc.font("Helvetica").fontSize(9).fillColor(DARK);
-    doc.text(`${lbl}: ${val}`, PAGE_MARGIN + 4, y);
-    y = doc.y;
-  }
+  // ── Sub-header: DATOS DE COBRANZA ─────────────────────────────────────────
+  doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8)
+    .text("DATOS DE COBRANZA", PAGE_MARGIN + 4, y + 3, {
+      width: totalW - 8, align: "center", lineBreak: false,
+    });
+  y += 14 + 4;
 
-  doc.font("Helvetica-Bold").fontSize(10).fillColor(DARK);
-  doc.text(`TOTAL: $${total.toFixed(2)}`, PAGE_MARGIN + 4, y);
-  y = doc.y;
+  const labelColW = totalW * 0.60;
+  const valueColX = PAGE_MARGIN + labelColW;
+  const valueColW = totalW - labelColW;
 
-  doc.font("Helvetica").fontSize(9).fillColor(DARK);
-  doc.text(`ANTICIPO (${pctAnticipo}%): $${montoAnticipo.toFixed(2)}`, PAGE_MARGIN + 4, y);
-  y = doc.y;
-  doc.text(`RESTANTE: $${restante.toFixed(2)}`, PAGE_MARGIN + 4, y);
-  y = doc.y + 4;
+  // ── Fila: MONTO DEL SERVICIO S/IVA ────────────────────────────────────────
+  doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+  doc.text("MONTO DEL SERVICIO S/IVA", PAGE_MARGIN + 4, y, {
+    width: labelColW - 8, lineBreak: false,
+  });
+  doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+  doc.text(`$${subtotal.toFixed(2)}`, valueColX, y, {
+    width: valueColW - 4, align: "right", lineBreak: false,
+  });
+  y += 13;
 
-  if (evento.fecha_pago_anticipo) {
-    doc.text(`FECHA PAGO ANTICIPO: ${formatFecha(evento.fecha_pago_anticipo)}`, PAGE_MARGIN + 4, y);
-    y = doc.y;
-  }
+  // ── Fila: IVA ─────────────────────────────────────────────────────────────
+  doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+  doc.text("IVA", PAGE_MARGIN + 4, y, {
+    width: labelColW - 8, lineBreak: false,
+  });
+  doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+  doc.text(`$${iva.toFixed(2)}`, valueColX, y, {
+    width: valueColW - 4, align: "right", lineBreak: false,
+  });
+  y += 13;
 
+  // ── Línea separadora ──────────────────────────────────────────────────────
+  doc.moveTo(PAGE_MARGIN, y).lineTo(PAGE_MARGIN + totalW, y)
+    .strokeColor("#aaaaaa").lineWidth(0.5).stroke();
+  y += 5;
+
+  // ── Fila: PRECIO TOTAL PACTADO ────────────────────────────────────────────
+  doc.font("Helvetica-Bold").fontSize(9.5).fillColor(DARK);
+  doc.text("PRECIO TOTAL PACTADO", PAGE_MARGIN + 4, y, {
+    width: labelColW - 8, lineBreak: false,
+  });
+  doc.font("Helvetica-Bold").fontSize(9.5).fillColor(DARK);
+  doc.text(`$${total.toFixed(2)}`, valueColX, y, {
+    width: valueColW - 4, align: "right", lineBreak: false,
+  });
+  y += 14;
+
+  // ── EN LETRA ──────────────────────────────────────────────────────────────
+  doc.font("Helvetica-Oblique").fontSize(7.5).fillColor("#555555");
+  doc.text("(EN LETRA)", PAGE_MARGIN + 4, y, { lineBreak: false });
   y += 10;
+  doc.font("Helvetica").fontSize(8).fillColor(DARK);
+  doc.text(totalEnLetra, PAGE_MARGIN + 4, y, { width: totalW - 8 });
+  y = doc.y + 8;
+
+  // ── Sub-header: FECHAS E IMPORTES ─────────────────────────────────────────
+  y = checkPageBreak(doc, y, 80);
+  doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8)
+    .text("FECHAS E IMPORTES A PAGAR DEL PRECIO", PAGE_MARGIN + 4, y + 3, {
+      width: totalW - 8, align: "center", lineBreak: false,
+    });
+  y += 14 + 6;
+
+  // ── Label ANTICIPOS ───────────────────────────────────────────────────────
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
+  doc.text("ANTICIPOS", PAGE_MARGIN + 4, y);
+  y += 12;
+
+  // ── Encabezado tabla de anticipos ─────────────────────────────────────────
+  const antColW  = Math.floor(totalW / 3);
+  const antCol1X = PAGE_MARGIN;
+  const antCol2X = antCol1X + antColW;
+  const antCol3X = antCol2X + antColW;
+
+  const ANT_HDR_H = 14;
+  doc.rect(antCol1X, y, totalW, ANT_HDR_H).fill(GRAY_HEADER);
+
+  [antCol2X, antCol3X].forEach(dx => {
+    doc.moveTo(dx, y).lineTo(dx, y + ANT_HDR_H)
+      .strokeColor("#999999").lineWidth(0.5).stroke();
+  });
+  doc.rect(antCol1X, y, totalW, ANT_HDR_H)
+    .strokeColor("#999999").lineWidth(0.5).stroke();
+
+  doc.font("Helvetica-Bold").fontSize(7.5).fillColor(DARK);
+  doc.text("PORCENTAJE",      antCol1X + 2, y + 3, { width: antColW - 4, align: "center", lineBreak: false });
+  doc.text("FECHA DE PAGO",   antCol2X + 2, y + 3, { width: antColW - 4, align: "center", lineBreak: false });
+  doc.text("IMPORTE A PAGAR", antCol3X + 2, y + 3, { width: antColW - 4, align: "center", lineBreak: false });
+  y += ANT_HDR_H;
+
+  // ── Fila de anticipo ──────────────────────────────────────────────────────
+  const ANT_ROW_H = 16;
+  doc.rect(antCol1X, y, totalW, ANT_ROW_H).fill(ORANGE_LIGHT);
+
+  [antCol2X, antCol3X].forEach(dx => {
+    doc.moveTo(dx, y).lineTo(dx, y + ANT_ROW_H)
+      .strokeColor("#e0c0aa").lineWidth(0.4).stroke();
+  });
+  doc.rect(antCol1X, y, totalW, ANT_ROW_H)
+    .strokeColor("#e0c0aa").lineWidth(0.4).stroke();
+
+  doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+  doc.text(`${pctAnticipo}%`,
+    antCol1X + 2, y + 4, { width: antColW - 4, align: "center", lineBreak: false });
+  doc.text(formatFecha(evento.fecha_pago_anticipo) || "-",
+    antCol2X + 2, y + 4, { width: antColW - 4, align: "center", lineBreak: false });
+  doc.text(`$  ${montoAnticipo.toFixed(2)}`,
+    antCol3X + 2, y + 4, { width: antColW - 4, align: "right", lineBreak: false });
+  y += ANT_ROW_H;
+
+  // ── FIX: Fila TOTAL con importe ───────────────────────────────────────────
+  const TOT_ROW_H = 14;
+  doc.rect(antCol1X, y, totalW, TOT_ROW_H).fill("#f5f5f5");
+  doc.rect(antCol1X, y, totalW, TOT_ROW_H)
+    .strokeColor("#cccccc").lineWidth(0.4).stroke();
+  doc.moveTo(antCol3X, y).lineTo(antCol3X, y + TOT_ROW_H)
+    .strokeColor("#cccccc").lineWidth(0.4).stroke();
+
+  doc.font("Helvetica-Bold").fontSize(8).fillColor(DARK);
+  doc.text("TOTAL", antCol1X + 2, y + 3, {
+    width: antColW * 2 - 4, align: "right", lineBreak: false,
+  });
+  // ── Importe total en la columna derecha ───────────────────────────────────
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor(DARK);
+  doc.text(`$  ${montoAnticipo.toFixed(2)}`, antCol3X + 2, y + 3, {
+    width: antColW - 4, align: "right", lineBreak: false,
+  });
+  y += TOT_ROW_H + 8;
+
+  // ── Sub-header: LIQUIDACIÓN DEL MONTO TOTAL ───────────────────────────────
+  y = checkPageBreak(doc, y, 40);
+  doc.rect(PAGE_MARGIN, y, totalW, 14).fill(GRAY_SECTION);
+  doc.fillColor(DARK).font("Helvetica-Bold").fontSize(8)
+    .text("LIQUIDACIÓN DEL MONTO TOTAL", PAGE_MARGIN + 4, y + 3, {
+      width: totalW - 8, align: "center", lineBreak: false,
+    });
+  y += 14;
+
+  // ── Fila RESTAN ───────────────────────────────────────────────────────────
+  const REST_ROW_H = 16;
+  doc.rect(antCol1X, y, totalW, REST_ROW_H).fill(ORANGE_LIGHT);
+  doc.rect(antCol1X, y, totalW, REST_ROW_H)
+    .strokeColor("#e0c0aa").lineWidth(0.4).stroke();
+  doc.moveTo(antCol3X, y).lineTo(antCol3X, y + REST_ROW_H)
+    .strokeColor("#e0c0aa").lineWidth(0.4).stroke();
+
+  doc.font("Helvetica-Bold").fontSize(8.5).fillColor(DARK);
+  doc.text("RESTAN",
+    antCol1X + 2, y + 4, { width: antColW * 2 - 4, align: "right", lineBreak: false });
+  doc.font("Helvetica").fontSize(8.5).fillColor(DARK);
+  doc.text(`$  ${restante.toFixed(2)}`,
+    antCol3X + 2, y + 4, { width: antColW - 4, align: "right", lineBreak: false });
+  y += REST_ROW_H + 10;
 
   // ── GARANTÍA POR SERVICIOS EXCEDENTES ────────────────────────────────────
   y = checkPageBreak(doc, y, 80);
