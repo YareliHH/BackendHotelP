@@ -3,7 +3,9 @@ import {
   crearEvento,
   obtenerEventos,
   obtenerResumen,
-  generarContrato  // 👈 agregar
+  generarContrato,
+  finalizarEvento,
+  eliminarEvento
 } from '../controllers/evento.controller.js';
 
 const router = express.Router();
@@ -11,6 +13,10 @@ const router = express.Router();
 router.post('/', crearEvento);
 router.get('/', obtenerEventos);
 router.get('/resumen', obtenerResumen);
-router.get('/contrato/:id', generarContrato);  // 👈 agregar
+router.get('/contrato/:id', generarContrato);
+router.put('/:id/finalizar', finalizarEvento);
+
+// 🔴 NUEVA RUTA
+router.delete('/:id', eliminarEvento);
 
 export default router;

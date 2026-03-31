@@ -101,6 +101,28 @@ const getResumen = async () => {
 };
 
 //////////////////////////////////////////////////////
+// FINALIZAR EVENTO (MODEL)
+//////////////////////////////////////////////////////
+
+const finalizarEvento = async (idEvento) => {
+  await db.promise().query(
+    "UPDATE eventos SET estado = 'finalizado' WHERE id_evento = ?",
+    [idEvento]
+  );
+};
+
+//////////////////////////////////////////////////////
+// ELIMINAR EVENTO (MODEL)
+//////////////////////////////////////////////////////
+
+const eliminarEvento = async (idEvento) => {
+  await db.promise().query(
+    "DELETE FROM eventos WHERE id_evento = ?",
+    [idEvento]
+  );
+};
+
+//////////////////////////////////////////////////////
 // EXPORT
 //////////////////////////////////////////////////////
 
@@ -110,5 +132,7 @@ export default {
   insertEventoServicioItem,
   actualizarTotales,  // 👈 agregado
   getEventos,
-  getResumen
+  getResumen,
+  finalizarEvento,
+  eliminarEvento// 👈 AGREGA ESTO
 };

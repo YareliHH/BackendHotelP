@@ -210,3 +210,37 @@ export const generarContrato = async (req, res) => {
     res.status(500).json({ mensaje: 'Error al generar contrato' });
   }
 };
+
+//////////////////////////////////////////////////////
+// FINALIZAR EVENTO (CONTROLLER)
+//////////////////////////////////////////////////////
+
+export const finalizarEvento = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await Evento.finalizarEvento(id);
+
+    res.json({ message: "Evento finalizado correctamente" });
+  } catch (error) {
+    console.error("Error al finalizar:", error);
+    res.status(500).json({ error: "Error al finalizar evento" });
+  }
+};
+
+//////////////////////////////////////////////////////
+// ELIMINAR EVENTO (CONTROLLER)
+//////////////////////////////////////////////////////
+
+export const eliminarEvento = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await Evento.eliminarEvento(id);
+
+    res.json({ message: "Evento eliminado correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar:", error);
+    res.status(500).json({ error: "Error al eliminar evento" });
+  }
+};
